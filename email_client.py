@@ -1,10 +1,11 @@
 from tkinter import *
 from tkinter import ttk
-from send_mail_smtp import Mail_Sender
-from recieve_mail_imap import Mail_Recieve
+from recieve_mail_imap import MailRecieve
 from functools import partial
+from Crypto.Cipher import AES
+from base64 import b64decode
 
-class Email_client:
+class EmailClient:
     # Запуск програми та створення Вікна входу
     def __init__(self):
         self.messages = ''
@@ -31,9 +32,9 @@ class Email_client:
         self.root.bind('<Return>', self.is_auth)
         self.root.mainloop()
 
-    def is_auth(self, event):
+    def is_auth(self, *event):
         try:
-            self.messages = Mail_Recieve.read_mail(self.login.get(), self.password.get())
+            self.messages = MailRecieve.read_mail(self.login.get(), self.password.get())
             self.root.title(self.login.get())
             self.mailbox()
         except Exception as e:
@@ -66,7 +67,7 @@ class Email_client:
             ttk.Button(frame, text=Subject[10:81], command=partial(self.message,i), width=70).grid(column=1, row=i, sticky=W)
             i += 1
 
-        ttk.Button(mainframe, text='Send mail', command=self.send).grid(sticky=(S, E))
+        ttk.Button(mainframe, text='Send mail', command=self.sendMail).grid(sticky=(S, E))
         # track changes to the canvas and frame width and sync them,
         # also updating the scrollbar
         def _configure_frame(event):
@@ -90,21 +91,47 @@ class Email_client:
         mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
         mainframe.columnconfigure(0, weight=1)
         mainframe.rowconfigure(0, weight=1)
-        From, To, Subject, msg = self.messages[id][0], self.messages[id][1], self.messages[id][2], self.messages[id][3]
-        text = Text(mainframe, width=80, height=25)
-        text.grid(column=0, row=1, sticky=W)
-        text.insert('1.0', From+'\n')
-        text.insert('end', To+'\n')
-        text.insert('end', Subject+'\n')
-        text.insert('end', msg)
-        text['state'] = 'disabled'
+        From, To, Subject, self.ciphertext = self.messages[id][0], self.messages[id][1], self.messages[id][2], self.messages[id][3]
+        self.text = Text(mainframe, width=80, height=25)
+        self.text.grid(column=0, row=1, sticky=W)
+        self.text.insert('1.0', From+'\n')
+        self.text.insert('end', To+'\n')
+        self.text.insert('end', Subject+'\n')
+        self.text.insert('end', self.ciphertext)
+        self.text['state'] = 'disabled'
         ttk.Button(mainframe, text='Вернутись', command=self.mailbox).grid(column=0, row=0, sticky=(N,W))
+        ttk.Button(mainframe, text='Розшифрувати', command=self.decrypt_message).grid(column=1, row=0, sticky=(N,E))
 
-    def send(self, *args):
+    def decrypt_message(self):
+        popup = Toplevel(self.root)
+        popup.geometry('250x200-320+180')
+
+        key = StringVar()
+        ttk.Label(popup, text="Введіть ключ (16 байт)").grid(column=0, row=0)
+        key_entry = ttk.Entry(popup, width=20, textvariable=key, show='*')
+        key_entry.grid(column=0, row=1)
+        key_entry.focus()
+
+        b = ttk.Button(popup, text="Okay", command=lambda:[popup.destroy(),decrypt()])
+        b.grid(column=0, row=2)
+        def decrypt():
+            b64 = self.ciphertext.split()
+            jv = [b64decode(b64[k]) for k in range(3)]
+
+            cipher = AES.new(key.get().encode(), AES.MODE_EAX, nonce=jv[0])
+            plaintext = cipher.decrypt_and_verify(jv[1], jv[2])
+            self.text['state'] = 'normal'
+            self.text.delete('5.0', 'end')
+            self.text.insert('end', '\n')
+            self.text.insert('end', plaintext.decode('utf-8'))
+            self.text['state'] = 'disabled'
+
+    def sendMail(self, *args):
         try:
-            Mail_Sender.send_mail(self.login.get(), self.password.get())
+            from send_mail_smtp import MailSender
+            MailSender(self)
         except Exception as e:
             print('Unsuccessful')
             print(e)
 
-client = Email_client()
+client = EmailClient()
