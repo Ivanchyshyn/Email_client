@@ -1,11 +1,11 @@
 from smtplib import SMTP_SSL as smtp
-from tkinter import *
-from tkinter import ttk
+from tkinter import N, W, S, E, StringVar, Text, Toplevel, ttk
 import json
 from base64 import b64encode
 from Crypto.Cipher import AES
 
 class MailSender:
+
     def __init__(self, client):
         self.client = client
         self.root = self.client.root
@@ -36,6 +36,7 @@ class MailSender:
         self.text.grid(column=0, row=3, sticky=W)
 
         self.root.mainloop()
+
     def send(self):
         if not self.receiver.get():
             MailSender(self.client)
@@ -50,8 +51,9 @@ class MailSender:
                 key_entry.grid(column=0, row=1)
                 key_entry.focus()
 
-                b = ttk.Button(popup, text="Okay", command=lambda:[popup.destroy(),send_cipher()])
-                b.grid(column=0, row=2)
+                btn = ttk.Button(popup, text="Окей", command=lambda:[popup.destroy(),send_cipher()])
+                btn.grid(column=0, row=2)
+                popup.bind('<Return>', lambda e: btn.invoke())
                 def send_cipher():
                     cipher = AES.new(key.get().encode('utf-8'), AES.MODE_EAX)
                     ciphertext, tag = cipher.encrypt_and_digest(self.text.get('1.0', 'end').encode('utf-8'))
